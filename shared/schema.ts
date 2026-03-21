@@ -1,17 +1,17 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { pgTable, text, serial, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   displayName: text("display_name").notNull(),
   role: text("role").notNull(), // "admin" or "guide"
 });
 
-export const hunts = sqliteTable("hunts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const hunts = pgTable("hunts", {
+  id: serial("id").primaryKey(),
   clientName: text("client_name").notNull(),
   clientEmail: text("client_email"),
   clientPhone: text("client_phone"),
@@ -24,8 +24,8 @@ export const hunts = sqliteTable("hunts", {
   createdAt: text("created_at").notNull(),
 });
 
-export const harvests = sqliteTable("harvests", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
+export const harvests = pgTable("harvests", {
+  id: serial("id").primaryKey(),
   huntId: integer("hunt_id").notNull(),
   animal: text("animal").notNull(),
   antlerSize: text("antler_size"),
