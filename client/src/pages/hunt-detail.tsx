@@ -2,7 +2,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Hunt, Harvest } from "@shared/schema";
-import { ANIMALS, ANIMALS_WITH_SIZE, GUIDES } from "@/lib/constants";
+import { ANIMALS, ANIMALS_WITH_SIZE } from "@/lib/constants";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +57,7 @@ export default function HuntDetail() {
   const [, params] = useRoute("/hunts/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const [harvestAnimal, setHarvestAnimal] = useState("");
   const [harvestSize, setHarvestSize] = useState("");
   const [harvestDate, setHarvestDate] = useState(new Date().toISOString().split("T")[0]);
@@ -322,15 +324,17 @@ export default function HuntDetail() {
                       {h.notes && ` · ${h.notes}`}
                     </div>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    data-testid={`button-delete-harvest-${h.id}`}
-                    onClick={() => removeHarvest.mutate(h.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      data-testid={`button-delete-harvest-${h.id}`}
+                      onClick={() => removeHarvest.mutate(h.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>
@@ -338,7 +342,8 @@ export default function HuntDetail() {
         </CardContent>
       </Card>
 
-      {/* Delete Hunt */}
+      {/* Delete Hunt - Admin only */}
+      {isAdmin && (
       <div className="mt-6 flex justify-center">
         <AlertDialog>
           <AlertDialogTrigger asChild>
@@ -366,6 +371,7 @@ export default function HuntDetail() {
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      )}
     </div>
   );
 }

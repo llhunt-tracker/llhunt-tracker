@@ -1,15 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 import type { Hunt } from "@shared/schema";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Search, Crosshair, Calendar, User, Phone, ChevronRight } from "lucide-react";
+import { UserPlus, Search, Crosshair, Calendar, User, Phone, ChevronRight, LogOut, Shield } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
+import { useAuth } from "@/lib/auth";
 
 function LLHuntLogo() {
   return (
@@ -20,14 +20,12 @@ function LLHuntLogo() {
           <stop offset="100%" stopColor="hsl(145, 35%, 38%)" />
         </linearGradient>
       </defs>
-      {/* Crosshair icon */}
       <circle cx="16" cy="20" r="10" fill="none" stroke="url(#logo-grad)" strokeWidth="2" />
       <circle cx="16" cy="20" r="3" fill="url(#logo-grad)" />
       <line x1="16" y1="6" x2="16" y2="12" stroke="url(#logo-grad)" strokeWidth="2" />
       <line x1="16" y1="28" x2="16" y2="34" stroke="url(#logo-grad)" strokeWidth="2" />
       <line x1="2" y1="20" x2="8" y2="20" stroke="url(#logo-grad)" strokeWidth="2" />
       <line x1="24" y1="20" x2="30" y2="20" stroke="url(#logo-grad)" strokeWidth="2" />
-      {/* LLHUNT text */}
       <text x="38" y="26" fontFamily="'General Sans', sans-serif" fontWeight="700" fontSize="20" fill="currentColor" letterSpacing="1">LLHUNT</text>
       <text x="130" y="26" fontFamily="'General Sans', sans-serif" fontWeight="400" fontSize="9" fill="currentColor" opacity="0.5" letterSpacing="0.5">TRACKER</text>
     </svg>
@@ -36,6 +34,7 @@ function LLHuntLogo() {
 
 export default function Dashboard() {
   const [search, setSearch] = useState("");
+  const { user, logout, isAdmin } = useAuth();
 
   const { data: hunts, isLoading } = useQuery<Hunt[]>({
     queryKey: ["/api/hunts"],
@@ -57,20 +56,41 @@ export default function Dashboard() {
       {/* Header */}
       <header className="flex items-center justify-between py-5 border-b border-border">
         <LLHuntLogo />
-        <Link href="/check-in">
-          <Button data-testid="button-new-checkin" size="sm" className="gap-1.5 font-semibold">
-            <UserPlus className="h-4 w-4" />
-            Check In
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/check-in">
+            <Button data-testid="button-new-checkin" size="sm" className="gap-1.5 font-semibold">
+              <UserPlus className="h-4 w-4" />
+              Check In
+            </Button>
+          </Link>
+        </div>
       </header>
 
+      {/* User bar */}
+      <div className="flex items-center justify-between mt-4 py-2 px-3 bg-muted/50 rounded-lg">
+        <div className="flex items-center gap-2 text-sm">
+          {isAdmin ? (
+            <Shield className="h-4 w-4 text-primary" />
+          ) : (
+            <User className="h-4 w-4 text-primary" />
+          )}
+          <span className="font-medium">{user?.displayName}</span>
+          <Badge variant="outline" className="text-xs">
+            {isAdmin ? "Admin" : "Guide"}
+          </Badge>
+        </div>
+        <Button variant="ghost" size="sm" onClick={logout} className="text-muted-foreground hover:text-foreground gap-1.5 h-8" data-testid="button-logout">
+          <LogOut className="h-3.5 w-3.5" />
+          Sign Out
+        </Button>
+      </div>
+
       {/* Search */}
-      <div className="relative mt-5">
+      <div className="relative mt-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
           data-testid="input-search"
-          placeholder="Search by client, guide, phone..."
+          placeholder={isAdmin ? "Search by client, guide, phone..." : "Search by client, phone..."}
           className="pl-10"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -79,16 +99,16 @@ export default function Dashboard() {
 
       {/* Stats Bar */}
       {!isLoading && hunts && (
-        <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-4 mt-3 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <Crosshair className="h-3.5 w-3.5" />
-            {hunts.length} hunt{hunts.length !== 1 ? "s" : ""} total
+            {hunts.length} hunt{hunts.length !== 1 ? "s" : ""}{isAdmin ? " total" : ""}
           </span>
         </div>
       )}
 
       {/* Hunt List */}
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-2">
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => (
             <Card key={i}>
@@ -108,11 +128,9 @@ export default function Dashboard() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-foreground truncate" data-testid={`text-client-${hunt.id}`}>
-                          {hunt.clientName}
-                        </h3>
-                      </div>
+                      <h3 className="font-semibold text-foreground truncate" data-testid={`text-client-${hunt.id}`}>
+                        {hunt.clientName}
+                      </h3>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <User className="h-3.5 w-3.5" />

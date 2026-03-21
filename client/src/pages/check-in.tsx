@@ -1,11 +1,12 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { GUIDES, US_STATES } from "@/lib/constants";
+import { useAuth } from "@/lib/auth";
+import { US_STATES } from "@/lib/constants";
 import {
   Form,
   FormField,
@@ -33,7 +34,8 @@ const formSchema = z.object({
   clientEmail: z.string().email("Invalid email").or(z.literal("")).optional(),
   clientPhone: z.string().optional(),
   clientState: z.string().optional(),
-  guideName: z.string().min(1, "Please select a guide"),
+  guideName: z.string().optional(),
+  guideUserId: z.number().optional(),
   huntDateStart: z.string().min(1, "Start date is required"),
   huntDateEnd: z.string().optional(),
   notes: z.string().optional(),
@@ -41,9 +43,20 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>;
 
+type UserInfo = { id: number; username: string; displayName: string; role: string };
+
 export default function CheckIn() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, isAdmin } = useAuth();
+
+  // Admin can pick guide from user list
+  const { data: allUsers } = useQuery<UserInfo[]>({
+    queryKey: ["/api/users"],
+    enabled: isAdmin,
+  });
+
+  const guideUsers = allUsers?.filter(u => u.role === "guide" || u.role === "admin") || [];
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -52,7 +65,8 @@ export default function CheckIn() {
       clientEmail: "",
       clientPhone: "",
       clientState: "",
-      guideName: "",
+      guideName: isAdmin ? "" : user?.displayName || "",
+      guideUserId: isAdmin ? undefined : user?.id,
       huntDateStart: new Date().toISOString().split("T")[0],
       huntDateEnd: "",
       notes: "",
@@ -61,10 +75,23 @@ export default function CheckIn() {
 
   const mutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await apiRequest("POST", "/api/hunts", {
-        ...data,
+      const payload: any = {
+        clientName: data.clientName,
+        clientEmail: data.clientEmail || null,
+        clientPhone: data.clientPhone || null,
+        clientState: data.clientState || null,
+        huntDateStart: data.huntDateStart,
+        huntDateEnd: data.huntDateEnd || null,
+        notes: data.notes || null,
         createdAt: new Date().toISOString(),
-      });
+      };
+
+      if (isAdmin && data.guideUserId) {
+        payload.guideUserId = data.guideUserId;
+        payload.guideName = data.guideName;
+      }
+
+      const res = await apiRequest("POST", "/api/hunts", payload);
       return res.json();
     },
     onSuccess: (hunt) => {
@@ -174,31 +201,48 @@ export default function CheckIn() {
                 )}
               />
 
-              {/* Guide */}
-              <FormField
-                control={form.control}
-                name="guideName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assigned Guide *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-guide">
-                          <SelectValue placeholder="Select guide" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {GUIDES.map((g) => (
-                          <SelectItem key={g} value={g}>
-                            {g}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Guide - only shown to admin */}
+              {isAdmin ? (
+                <FormField
+                  control={form.control}
+                  name="guideUserId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assigned Guide *</FormLabel>
+                      <Select
+                        onValueChange={(v) => {
+                          const selectedUser = guideUsers.find(u => u.id === Number(v));
+                          field.onChange(Number(v));
+                          if (selectedUser) {
+                            form.setValue("guideName", selectedUser.displayName);
+                          }
+                        }}
+                        value={field.value?.toString() || ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-guide">
+                            <SelectValue placeholder="Select guide" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {guideUsers.map((g) => (
+                            <SelectItem key={g.id} value={g.id.toString()}>
+                              {g.displayName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                  <span className="text-muted-foreground">Guide: </span>
+                  <span className="font-medium">{user?.displayName}</span>
+                  <span className="text-muted-foreground ml-1">(auto-assigned)</span>
+                </div>
+              )}
 
               {/* Hunt Dates */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

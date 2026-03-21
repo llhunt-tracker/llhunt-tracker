@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: llhunt-tracker
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build && npx drizzle-kit push
+    startCommand: NODE_ENV=production node dist/index.cjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+    disk:
+      name: llhunt-data
+      mountPath: /opt/render/project/src
+      sizeGB: 1

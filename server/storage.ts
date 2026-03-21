@@ -1,26 +1,60 @@
-import { hunts, harvests, type Hunt, type Harvest, type InsertHunt, type InsertHarvest } from "@shared/schema";
+import { users, hunts, harvests, type User, type Hunt, type Harvest, type InsertUser, type InsertHunt, type InsertHarvest } from "@shared/schema";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
-const sqlite = new Database("sqlite.db");
+const sqlite = new Database("data.db");
 const db = drizzle(sqlite);
 
 export interface IStorage {
+  // Users
+  getUserByUsername(username: string): User | undefined;
+  getUserById(id: number): User | undefined;
+  createUser(user: InsertUser): User;
+  getAllUsers(): User[];
+  
+  // Hunts
   getHunts(): Hunt[];
+  getHuntsByGuide(guideUserId: number): Hunt[];
   getHunt(id: number): Hunt | undefined;
   createHunt(hunt: InsertHunt): Hunt;
   updateHunt(id: number, hunt: Partial<InsertHunt>): Hunt | undefined;
   deleteHunt(id: number): void;
+  
+  // Harvests
   getHarvestsByHunt(huntId: number): Harvest[];
   createHarvest(harvest: InsertHarvest): Harvest;
   deleteHarvest(id: number): void;
-  searchHunts(query: string): Hunt[];
+  
+  // Search
+  searchHunts(query: string, guideUserId?: number): Hunt[];
 }
 
 export class DatabaseStorage implements IStorage {
+  // Users
+  getUserByUsername(username: string): User | undefined {
+    return db.select().from(users).where(eq(users.username, username)).get();
+  }
+
+  getUserById(id: number): User | undefined {
+    return db.select().from(users).where(eq(users.id, id)).get();
+  }
+
+  createUser(user: InsertUser): User {
+    return db.insert(users).values(user).returning().get();
+  }
+
+  getAllUsers(): User[] {
+    return db.select().from(users).all();
+  }
+
+  // Hunts
   getHunts(): Hunt[] {
     return db.select().from(hunts).orderBy(desc(hunts.createdAt)).all();
+  }
+
+  getHuntsByGuide(guideUserId: number): Hunt[] {
+    return db.select().from(hunts).where(eq(hunts.guideUserId, guideUserId)).orderBy(desc(hunts.createdAt)).all();
   }
 
   getHunt(id: number): Hunt | undefined {
@@ -36,11 +70,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   deleteHunt(id: number): void {
-    // Delete associated harvests first
     db.delete(harvests).where(eq(harvests.huntId, id)).run();
     db.delete(hunts).where(eq(hunts.id, id)).run();
   }
 
+  // Harvests
   getHarvestsByHunt(huntId: number): Harvest[] {
     return db.select().from(harvests).where(eq(harvests.huntId, huntId)).all();
   }
@@ -53,10 +87,11 @@ export class DatabaseStorage implements IStorage {
     db.delete(harvests).where(eq(harvests.id, id)).run();
   }
 
-  searchHunts(query: string): Hunt[] {
-    const allHunts = this.getHunts();
+  // Search
+  searchHunts(query: string, guideUserId?: number): Hunt[] {
+    const baseHunts = guideUserId ? this.getHuntsByGuide(guideUserId) : this.getHunts();
     const lowerQuery = query.toLowerCase();
-    return allHunts.filter(
+    return baseHunts.filter(
       (h) =>
         h.clientName.toLowerCase().includes(lowerQuery) ||
         (h.clientPhone && h.clientPhone.includes(query)) ||
