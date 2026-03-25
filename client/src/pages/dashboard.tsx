@@ -10,25 +10,11 @@ import { UserPlus, Search, Crosshair, Calendar, User, Phone, ChevronRight, LogOu
 import { useState } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
+import logoImg from "@assets/logo.jpg";
 
 function LLHuntLogo() {
   return (
-    <svg viewBox="0 0 180 40" aria-label="LLHUNT Adventures" className="h-8 w-auto">
-      <defs>
-        <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor="hsl(145, 35%, 28%)" />
-          <stop offset="100%" stopColor="hsl(145, 35%, 38%)" />
-        </linearGradient>
-      </defs>
-      <circle cx="16" cy="20" r="10" fill="none" stroke="url(#logo-grad)" strokeWidth="2" />
-      <circle cx="16" cy="20" r="3" fill="url(#logo-grad)" />
-      <line x1="16" y1="6" x2="16" y2="12" stroke="url(#logo-grad)" strokeWidth="2" />
-      <line x1="16" y1="28" x2="16" y2="34" stroke="url(#logo-grad)" strokeWidth="2" />
-      <line x1="2" y1="20" x2="8" y2="20" stroke="url(#logo-grad)" strokeWidth="2" />
-      <line x1="24" y1="20" x2="30" y2="20" stroke="url(#logo-grad)" strokeWidth="2" />
-      <text x="38" y="26" fontFamily="'General Sans', sans-serif" fontWeight="700" fontSize="20" fill="currentColor" letterSpacing="1">LLHUNT</text>
-      <text x="130" y="26" fontFamily="'General Sans', sans-serif" fontWeight="400" fontSize="9" fill="currentColor" opacity="0.5" letterSpacing="0.5">TRACKER</text>
-    </svg>
+    <img src={logoImg} alt="LLHUNT Adventures" className="h-10 w-auto rounded-full" />
   );
 }
 

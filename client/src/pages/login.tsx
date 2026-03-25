@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Crosshair, LogIn, Eye, EyeOff } from "lucide-react";
+import logoImg from "@assets/logo.jpg";
 
 export default function Login() {
   const { login } = useAuth();
@@ -32,18 +33,8 @@ export default function Login() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <svg viewBox="0 0 40 40" className="h-10 w-10 text-primary">
-              <circle cx="20" cy="20" r="14" fill="none" stroke="currentColor" strokeWidth="2.5" />
-              <circle cx="20" cy="20" r="4" fill="currentColor" />
-              <line x1="20" y1="2" x2="20" y2="9" stroke="currentColor" strokeWidth="2.5" />
-              <line x1="20" y1="31" x2="20" y2="38" stroke="currentColor" strokeWidth="2.5" />
-              <line x1="2" y1="20" x2="9" y2="20" stroke="currentColor" strokeWidth="2.5" />
-              <line x1="31" y1="20" x2="38" y2="20" stroke="currentColor" strokeWidth="2.5" />
-            </svg>
-            <span className="text-2xl font-bold tracking-wide">LLHUNT</span>
-          </div>
-          <p className="text-muted-foreground text-sm">Hunt Tracker</p>
+          <img src={logoImg} alt="LLHUNT Adventures" className="h-32 w-auto rounded-full" />
+          <p className="text-muted-foreground text-sm mt-2">Hunt Tracker</p>
         </div>
 
         <Card>
