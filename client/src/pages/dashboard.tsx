@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserPlus, Search, Crosshair, Calendar, User, Phone, ChevronRight, LogOut, Shield } from "lucide-react";
+import { UserPlus, Search, Crosshair, Calendar, User, Phone, ChevronRight, LogOut, Shield, Star } from "lucide-react";
 import { useState } from "react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
@@ -148,11 +148,27 @@ export default function Dashboard() {
                           </span>
                         )}
                       </div>
-                      {hunt.clientState && (
-                        <Badge variant="secondary" className="mt-2 text-xs">
-                          {hunt.clientState}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2 mt-2">
+                        {hunt.clientState && (
+                          <Badge variant="secondary" className="text-xs">
+                            {hunt.clientState}
+                          </Badge>
+                        )}
+                        {hunt.clientRating && (
+                          <div className="flex items-center gap-0.5">
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Star
+                                key={s}
+                                className={`h-3 w-3 ${
+                                  s <= hunt.clientRating!
+                                    ? "fill-amber-400 text-amber-400"
+                                    : "text-muted-foreground/20"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 mt-1" />
                   </div>

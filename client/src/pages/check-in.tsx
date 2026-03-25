@@ -26,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, UserPlus } from "lucide-react";
+import { ArrowLeft, UserPlus, Star } from "lucide-react";
 import { Link } from "wouter";
 
 const formSchema = z.object({
@@ -39,6 +39,7 @@ const formSchema = z.object({
   huntDateStart: z.string().min(1, "Start date is required"),
   huntDateEnd: z.string().optional(),
   notes: z.string().optional(),
+  clientRating: z.number().min(1).max(5).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -70,6 +71,7 @@ export default function CheckIn() {
       huntDateStart: new Date().toISOString().split("T")[0],
       huntDateEnd: "",
       notes: "",
+      clientRating: undefined,
     },
   });
 
@@ -83,6 +85,7 @@ export default function CheckIn() {
         huntDateStart: data.huntDateStart,
         huntDateEnd: data.huntDateEnd || null,
         notes: data.notes || null,
+        clientRating: data.clientRating || null,
         createdAt: new Date().toISOString(),
       };
 
@@ -273,6 +276,42 @@ export default function CheckIn() {
                   )}
                 />
               </div>
+
+              {/* Client Rating */}
+              <FormField
+                control={form.control}
+                name="clientRating"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Client Rating</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-1 pt-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => field.onChange(star === field.value ? undefined : star)}
+                            className="cursor-pointer hover:scale-110 transition-transform"
+                            data-testid={`star-checkin-${star}`}
+                          >
+                            <Star
+                              className={`h-7 w-7 ${
+                                (field.value || 0) >= star
+                                  ? "fill-amber-400 text-amber-400"
+                                  : "text-muted-foreground/30"
+                              }`}
+                            />
+                          </button>
+                        ))}
+                        {field.value && (
+                          <span className="text-sm text-muted-foreground ml-2">{field.value}/5</span>
+                        )}
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* Notes */}
               <FormField

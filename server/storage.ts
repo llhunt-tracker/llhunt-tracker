@@ -1,106 +1,95 @@
 import { users, hunts, harvests, type User, type Hunt, type Harvest, type InsertUser, type InsertHunt, type InsertHarvest } from "@shared/schema";
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
 import { eq, desc, and } from "drizzle-orm";
 
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("render.com") ? { rejectUnauthorized: false } : undefined,
-});
-
-const db = drizzle(pool);
+const sqlite = new Database("data.db");
+const db = drizzle(sqlite);
 
 export interface IStorage {
   // Users
-  getUserByUsername(username: string): Promise<User | undefined>;
-  getUserById(id: number): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-  getAllUsers(): Promise<User[]>;
+  getUserByUsername(username: string): User | undefined;
+  getUserById(id: number): User | undefined;
+  createUser(user: InsertUser): User;
+  getAllUsers(): User[];
   
   // Hunts
-  getHunts(): Promise<Hunt[]>;
-  getHuntsByGuide(guideUserId: number): Promise<Hunt[]>;
-  getHunt(id: number): Promise<Hunt | undefined>;
-  createHunt(hunt: InsertHunt): Promise<Hunt>;
-  updateHunt(id: number, hunt: Partial<InsertHunt>): Promise<Hunt | undefined>;
-  deleteHunt(id: number): Promise<void>;
+  getHunts(): Hunt[];
+  getHuntsByGuide(guideUserId: number): Hunt[];
+  getHunt(id: number): Hunt | undefined;
+  createHunt(hunt: InsertHunt): Hunt;
+  updateHunt(id: number, hunt: Partial<InsertHunt>): Hunt | undefined;
+  deleteHunt(id: number): void;
   
   // Harvests
-  getHarvestsByHunt(huntId: number): Promise<Harvest[]>;
-  createHarvest(harvest: InsertHarvest): Promise<Harvest>;
-  deleteHarvest(id: number): Promise<void>;
+  getHarvestsByHunt(huntId: number): Harvest[];
+  createHarvest(harvest: InsertHarvest): Harvest;
+  deleteHarvest(id: number): void;
   
   // Search
-  searchHunts(query: string, guideUserId?: number): Promise<Hunt[]>;
+  searchHunts(query: string, guideUserId?: number): Hunt[];
 }
 
 export class DatabaseStorage implements IStorage {
   // Users
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const rows = await db.select().from(users).where(eq(users.username, username));
-    return rows[0];
+  getUserByUsername(username: string): User | undefined {
+    return db.select().from(users).where(eq(users.username, username)).get();
   }
 
-  async getUserById(id: number): Promise<User | undefined> {
-    const rows = await db.select().from(users).where(eq(users.id, id));
-    return rows[0];
+  getUserById(id: number): User | undefined {
+    return db.select().from(users).where(eq(users.id, id)).get();
   }
 
-  async createUser(user: InsertUser): Promise<User> {
-    const rows = await db.insert(users).values(user).returning();
-    return rows[0];
+  createUser(user: InsertUser): User {
+    return db.insert(users).values(user).returning().get();
   }
 
-  async getAllUsers(): Promise<User[]> {
-    return db.select().from(users);
+  getAllUsers(): User[] {
+    return db.select().from(users).all();
   }
 
   // Hunts
-  async getHunts(): Promise<Hunt[]> {
-    return db.select().from(hunts).orderBy(desc(hunts.createdAt));
+  getHunts(): Hunt[] {
+    return db.select().from(hunts).orderBy(desc(hunts.createdAt)).all();
   }
 
-  async getHuntsByGuide(guideUserId: number): Promise<Hunt[]> {
-    return db.select().from(hunts).where(eq(hunts.guideUserId, guideUserId)).orderBy(desc(hunts.createdAt));
+  getHuntsByGuide(guideUserId: number): Hunt[] {
+    return db.select().from(hunts).where(eq(hunts.guideUserId, guideUserId)).orderBy(desc(hunts.createdAt)).all();
   }
 
-  async getHunt(id: number): Promise<Hunt | undefined> {
-    const rows = await db.select().from(hunts).where(eq(hunts.id, id));
-    return rows[0];
+  getHunt(id: number): Hunt | undefined {
+    return db.select().from(hunts).where(eq(hunts.id, id)).get();
   }
 
-  async createHunt(hunt: InsertHunt): Promise<Hunt> {
-    const rows = await db.insert(hunts).values(hunt).returning();
-    return rows[0];
+  createHunt(hunt: InsertHunt): Hunt {
+    return db.insert(hunts).values(hunt).returning().get();
   }
 
-  async updateHunt(id: number, data: Partial<InsertHunt>): Promise<Hunt | undefined> {
-    const rows = await db.update(hunts).set(data).where(eq(hunts.id, id)).returning();
-    return rows[0];
+  updateHunt(id: number, data: Partial<InsertHunt>): Hunt | undefined {
+    return db.update(hunts).set(data).where(eq(hunts.id, id)).returning().get();
   }
 
-  async deleteHunt(id: number): Promise<void> {
-    await db.delete(harvests).where(eq(harvests.huntId, id));
-    await db.delete(hunts).where(eq(hunts.id, id));
+  deleteHunt(id: number): void {
+    db.delete(harvests).where(eq(harvests.huntId, id)).run();
+    db.delete(hunts).where(eq(hunts.id, id)).run();
   }
 
   // Harvests
-  async getHarvestsByHunt(huntId: number): Promise<Harvest[]> {
-    return db.select().from(harvests).where(eq(harvests.huntId, huntId));
+  getHarvestsByHunt(huntId: number): Harvest[] {
+    return db.select().from(harvests).where(eq(harvests.huntId, huntId)).all();
   }
 
-  async createHarvest(harvest: InsertHarvest): Promise<Harvest> {
-    const rows = await db.insert(harvests).values(harvest).returning();
-    return rows[0];
+  createHarvest(harvest: InsertHarvest): Harvest {
+    return db.insert(harvests).values(harvest).returning().get();
   }
 
-  async deleteHarvest(id: number): Promise<void> {
-    await db.delete(harvests).where(eq(harvests.id, id));
+  deleteHarvest(id: number): void {
+    db.delete(harvests).where(eq(harvests.id, id)).run();
   }
 
   // Search
-  async searchHunts(query: string, guideUserId?: number): Promise<Hunt[]> {
-    const baseHunts = guideUserId ? await this.getHuntsByGuide(guideUserId) : await this.getHunts();
+  searchHunts(query: string, guideUserId?: number): Hunt[] {
+    const baseHunts = guideUserId ? this.getHuntsByGuide(guideUserId) : this.getHunts();
     const lowerQuery = query.toLowerCase();
     return baseHunts.filter(
       (h) =>

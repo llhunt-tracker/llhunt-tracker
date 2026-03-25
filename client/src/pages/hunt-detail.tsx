@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Hunt, Harvest } from "@shared/schema";
-import { ANIMALS, ANIMALS_WITH_SIZE } from "@/lib/constants";
+import { ANIMALS, ANIMALS_WITH_SIZE, GUIDES, US_STATES } from "@/lib/constants";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,23 +46,56 @@ import {
   MapPin,
   StickyNote,
   Crosshair,
+  Pencil,
+  Star,
+  Check,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 type HuntWithHarvests = Hunt & { harvests: Harvest[] };
+type UserInfo = { id: number; username: string; displayName: string; role: string };
+
+function StarRating({ rating, onRate, readonly = false, size = "md" }: { rating: number | null; onRate?: (r: number) => void; readonly?: boolean; size?: "sm" | "md" }) {
+  const px = size === "sm" ? "h-4 w-4" : "h-6 w-6";
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          disabled={readonly}
+          onClick={() => onRate?.(star)}
+          className={`${readonly ? "cursor-default" : "cursor-pointer hover:scale-110 transition-transform"}`}
+          data-testid={`star-${star}`}
+        >
+          <Star
+            className={`${px} ${
+              (rating || 0) >= star
+                ? "fill-amber-400 text-amber-400"
+                : "text-muted-foreground/30"
+            }`}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function HuntDetail() {
   const [, params] = useRoute("/hunts/:id");
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [harvestAnimal, setHarvestAnimal] = useState("");
   const [harvestSize, setHarvestSize] = useState("");
   const [harvestDate, setHarvestDate] = useState(new Date().toISOString().split("T")[0]);
   const [harvestNotes, setHarvestNotes] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState<Record<string, any>>({});
 
   const huntId = params?.id ? Number(params.id) : 0;
 
@@ -74,6 +107,13 @@ export default function HuntDetail() {
     },
     enabled: huntId > 0,
   });
+
+  const { data: allUsers } = useQuery<UserInfo[]>({
+    queryKey: ["/api/users"],
+    enabled: isAdmin,
+  });
+
+  const guideUsers = allUsers?.filter(u => u.role === "guide" || u.role === "admin") || [];
 
   const addHarvest = useMutation({
     mutationFn: async () => {
@@ -122,7 +162,71 @@ export default function HuntDetail() {
     },
   });
 
+  const updateHunt = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      const res = await apiRequest("PATCH", `/api/hunts/${huntId}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/hunts", huntId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/hunts"] });
+      toast({ title: "Hunt updated" });
+      setEditing(false);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update hunt.", variant: "destructive" });
+    },
+  });
+
+  const rateClient = useMutation({
+    mutationFn: async (rating: number) => {
+      const res = await apiRequest("PATCH", `/api/hunts/${huntId}`, { clientRating: rating });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/hunts", huntId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/hunts"] });
+      toast({ title: "Rating saved" });
+    },
+  });
+
+  function startEditing() {
+    if (!hunt) return;
+    setEditData({
+      clientName: hunt.clientName,
+      clientEmail: hunt.clientEmail || "",
+      clientPhone: hunt.clientPhone || "",
+      clientState: hunt.clientState || "",
+      guideName: hunt.guideName,
+      guideUserId: hunt.guideUserId,
+      huntDateStart: hunt.huntDateStart,
+      huntDateEnd: hunt.huntDateEnd || "",
+      notes: hunt.notes || "",
+    });
+    setEditing(true);
+  }
+
+  function saveEdit() {
+    const payload: Record<string, any> = {
+      clientName: editData.clientName,
+      clientEmail: editData.clientEmail || null,
+      clientPhone: editData.clientPhone || null,
+      clientState: editData.clientState || null,
+      huntDateStart: editData.huntDateStart,
+      huntDateEnd: editData.huntDateEnd || null,
+      notes: editData.notes || null,
+    };
+    if (isAdmin && editData.guideUserId) {
+      payload.guideUserId = editData.guideUserId;
+      payload.guideName = editData.guideName;
+    }
+    updateHunt.mutate(payload);
+  }
+
   const showSizeField = (ANIMALS_WITH_SIZE as readonly string[]).includes(harvestAnimal);
+
+  // Can edit if admin, or if guide owns this hunt
+  const canEdit = isAdmin || (hunt && hunt.guideUserId === user?.id);
 
   if (isLoading) {
     return (
@@ -164,52 +268,195 @@ export default function HuntDetail() {
             {hunt.clientName}
           </h1>
         </div>
+        {canEdit && !editing && (
+          <Button variant="outline" size="sm" onClick={startEditing} data-testid="button-edit-hunt" className="gap-1.5">
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Button>
+        )}
       </header>
 
       {/* Client Info Card */}
       <Card className="mt-5">
         <CardContent className="p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <User className="h-4 w-4 shrink-0 text-primary" />
-              <span>Guide: <span className="text-foreground font-medium">{hunt.guideName}</span></span>
+          {editing ? (
+            /* ---- EDIT MODE ---- */
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Client Name *</label>
+                <Input
+                  data-testid="edit-client-name"
+                  value={editData.clientName}
+                  onChange={(e) => setEditData({ ...editData, clientName: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Phone</label>
+                  <Input
+                    data-testid="edit-phone"
+                    type="tel"
+                    value={editData.clientPhone}
+                    onChange={(e) => setEditData({ ...editData, clientPhone: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Email</label>
+                  <Input
+                    data-testid="edit-email"
+                    type="email"
+                    value={editData.clientEmail}
+                    onChange={(e) => setEditData({ ...editData, clientEmail: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Home State</label>
+                <Select
+                  value={editData.clientState}
+                  onValueChange={(v) => setEditData({ ...editData, clientState: v })}
+                >
+                  <SelectTrigger data-testid="edit-state">
+                    <SelectValue placeholder="Select state" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {US_STATES.map((st) => (
+                      <SelectItem key={st} value={st}>{st}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Guide selection - admin only */}
+              {isAdmin && (
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Assigned Guide</label>
+                  <Select
+                    value={editData.guideUserId?.toString() || ""}
+                    onValueChange={(v) => {
+                      const selected = guideUsers.find(u => u.id === Number(v));
+                      setEditData({ ...editData, guideUserId: Number(v), guideName: selected?.displayName || editData.guideName });
+                    }}
+                  >
+                    <SelectTrigger data-testid="edit-guide">
+                      <SelectValue placeholder="Select guide" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {guideUsers.map((g) => (
+                        <SelectItem key={g.id} value={g.id.toString()}>{g.displayName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Hunt Start Date *</label>
+                  <Input
+                    data-testid="edit-date-start"
+                    type="date"
+                    value={editData.huntDateStart}
+                    onChange={(e) => setEditData({ ...editData, huntDateStart: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium mb-1 block">Hunt End Date</label>
+                  <Input
+                    data-testid="edit-date-end"
+                    type="date"
+                    value={editData.huntDateEnd}
+                    onChange={(e) => setEditData({ ...editData, huntDateEnd: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Notes</label>
+                <Textarea
+                  data-testid="edit-notes"
+                  rows={3}
+                  value={editData.notes}
+                  onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <Button
+                  data-testid="button-save-edit"
+                  className="flex-1 font-semibold gap-1.5"
+                  onClick={saveEdit}
+                  disabled={updateHunt.isPending || !editData.clientName}
+                >
+                  <Check className="h-4 w-4" />
+                  {updateHunt.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+                <Button
+                  data-testid="button-cancel-edit"
+                  variant="outline"
+                  onClick={() => setEditing(false)}
+                  className="gap-1.5"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Calendar className="h-4 w-4 shrink-0 text-primary" />
-              <span>
-                {format(new Date(hunt.huntDateStart), "MMM d, yyyy")}
-                {hunt.huntDateEnd && ` – ${format(new Date(hunt.huntDateEnd), "MMM d, yyyy")}`}
-              </span>
+          ) : (
+            /* ---- VIEW MODE ---- */
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <User className="h-4 w-4 shrink-0 text-primary" />
+                  <span>Guide: <span className="text-foreground font-medium">{hunt.guideName}</span></span>
+                </div>
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    {format(new Date(hunt.huntDateStart), "MMM d, yyyy")}
+                    {hunt.huntDateEnd && ` – ${format(new Date(hunt.huntDateEnd), "MMM d, yyyy")}`}
+                  </span>
+                </div>
+                {hunt.clientPhone && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0 text-primary" />
+                    <a href={`tel:${hunt.clientPhone}`} className="text-foreground hover:underline">
+                      {hunt.clientPhone}
+                    </a>
+                  </div>
+                )}
+                {hunt.clientEmail && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Mail className="h-4 w-4 shrink-0 text-primary" />
+                    <a href={`mailto:${hunt.clientEmail}`} className="text-foreground hover:underline truncate">
+                      {hunt.clientEmail}
+                    </a>
+                  </div>
+                )}
+                {hunt.clientState && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <MapPin className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-foreground">{hunt.clientState}</span>
+                  </div>
+                )}
+                {hunt.notes && (
+                  <div className="flex items-start gap-2 text-muted-foreground sm:col-span-2">
+                    <StickyNote className="h-4 w-4 shrink-0 text-primary mt-0.5" />
+                    <span className="text-foreground">{hunt.notes}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Client Rating */}
+              <div className="border-t border-border pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">Client Rating</span>
+                  <StarRating
+                    rating={hunt.clientRating}
+                    onRate={(r) => rateClient.mutate(r)}
+                  />
+                </div>
+              </div>
             </div>
-            {hunt.clientPhone && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Phone className="h-4 w-4 shrink-0 text-primary" />
-                <a href={`tel:${hunt.clientPhone}`} className="text-foreground hover:underline">
-                  {hunt.clientPhone}
-                </a>
-              </div>
-            )}
-            {hunt.clientEmail && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Mail className="h-4 w-4 shrink-0 text-primary" />
-                <a href={`mailto:${hunt.clientEmail}`} className="text-foreground hover:underline truncate">
-                  {hunt.clientEmail}
-                </a>
-              </div>
-            )}
-            {hunt.clientState && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-4 w-4 shrink-0 text-primary" />
-                <span className="text-foreground">{hunt.clientState}</span>
-              </div>
-            )}
-            {hunt.notes && (
-              <div className="flex items-start gap-2 text-muted-foreground sm:col-span-2">
-                <StickyNote className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                <span className="text-foreground">{hunt.notes}</span>
-              </div>
-            )}
-          </div>
+          )}
         </CardContent>
       </Card>
 
