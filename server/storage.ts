@@ -6,12 +6,50 @@ import { eq, desc, and } from "drizzle-orm";
 import path from "path";
 import fs from "fs";
 
-// Use persistent disk on Render, or local file in dev
-const dbDir = process.env.NODE_ENV === "production" && fs.existsSync("/opt/render/project/src/data")
-  ? "/opt/render/project/src/data"
-  : ".";
+// Use persistent disk on Render if available, otherwise local
+const renderDisk = "/opt/render/project/src/data";
+let dbDir = ".";
+if (fs.existsSync(renderDisk)) {
+  dbDir = renderDisk;
+  console.log(`Using persistent disk at ${renderDisk}`);
+}
 const dbPath = path.join(dbDir, "data.db");
+console.log(`Database path: ${dbPath}`);
 const sqlite = new Database(dbPath);
+
+// Create tables if they don't exist (needed for fresh persistent disk)
+sqlite.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    role TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS hunts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    client_name TEXT NOT NULL,
+    client_email TEXT,
+    client_phone TEXT,
+    client_state TEXT,
+    guide_name TEXT NOT NULL,
+    guide_user_id INTEGER,
+    hunt_date_start TEXT NOT NULL,
+    hunt_date_end TEXT,
+    notes TEXT,
+    client_rating INTEGER,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS harvests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hunt_id INTEGER NOT NULL,
+    animal TEXT NOT NULL,
+    antler_size TEXT,
+    harvest_date TEXT NOT NULL,
+    notes TEXT
+  );
+`);
+
 const db = drizzle(sqlite);
 
 export interface IStorage {
