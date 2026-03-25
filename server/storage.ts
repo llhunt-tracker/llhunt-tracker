@@ -3,7 +3,15 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, desc, and } from "drizzle-orm";
 
-const sqlite = new Database("data.db");
+import path from "path";
+import fs from "fs";
+
+// Use persistent disk on Render, or local file in dev
+const dbDir = process.env.NODE_ENV === "production" && fs.existsSync("/opt/render/project/src/data")
+  ? "/opt/render/project/src/data"
+  : ".";
+const dbPath = path.join(dbDir, "data.db");
+const sqlite = new Database(dbPath);
 const db = drizzle(sqlite);
 
 export interface IStorage {
